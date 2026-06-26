@@ -1,0 +1,2118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Geo Intelligence Tool</title>
+
+  <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
+  <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg-dark:       #0d1117;
+      --bg-panel:      #161b22;
+      --bg-panel-2:    #1c2330;
+      --border:        #30363d;
+      --accent:        #e8a838;
+      --accent-dim:    #b8832a;
+      --text-primary:  #e6edf3;
+      --text-secondary:#8b949e;
+      --text-muted:    #484f58;
+      --green:         #3fb950;
+      --red:           #f85149;
+      --blue:          #58a6ff;
+      --panel-width:   300px;
+      --topbar-height: 52px;
+      --font-ui:       'DM Mono', 'Courier New', monospace;
+      --font-display:  'Bebas Neue', 'Impact', sans-serif;
+
+      --col-farms:       #4ade80;
+      --col-processors:  #f87171;
+      --col-residential: #60a5fa;
+      --col-accommodation: #fb923c;
+    }
+
+    @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@300;400;500&display=swap');
+
+    html, body { height: 100%; width: 100%; overflow: hidden; background: var(--bg-dark); color: var(--text-primary); font-family: var(--font-ui); font-size: 13px; }
+    #app { display: flex; flex-direction: column; height: 100vh; width: 100vw; }
+
+    /* ── Topbar ── */
+    #topbar { height: var(--topbar-height); background: var(--bg-panel); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 16px; gap: 12px; flex-shrink: 0; z-index: 100; }
+    #logo { font-family: var(--font-display); font-size: 22px; letter-spacing: 2px; color: var(--accent); white-space: nowrap; user-select: none; }
+    #logo span { color: var(--text-secondary); font-size: 11px; font-family: var(--font-ui); letter-spacing: 1px; margin-left: 8px; vertical-align: middle; }
+    .topbar-spacer { flex: 1; }
+    .topbar-btn { height: 32px; padding: 0 14px; border: 1px solid var(--border); background: var(--bg-panel-2); color: var(--text-primary); font-family: var(--font-ui); font-size: 12px; letter-spacing: 0.5px; cursor: pointer; border-radius: 4px; transition: border-color 0.15s, background 0.15s, color 0.15s; white-space: nowrap; }
+    .topbar-btn:hover { border-color: var(--accent); background: var(--bg-panel); }
+    .topbar-btn.danger { border-color: var(--red); color: var(--red); }
+    .topbar-btn.success { border-color: var(--green); color: var(--green); }
+
+    /* ── Main ── */
+    #main { display: flex; flex: 1; overflow: hidden; }
+
+    /* ── Left panel ── */
+    #panel-left { width: var(--panel-width); background: var(--bg-panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; z-index: 10; overflow: hidden; }
+    .panel-section { border-bottom: 1px solid var(--border); padding: 14px 16px; flex-shrink: 0; }
+    .panel-section-title { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-muted); margin-bottom: 12px; font-weight: 500; }
+
+    /* Style toggle */
+    .style-toggle { display: flex; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+    .style-btn { flex: 1; padding: 7px 0; text-align: center; cursor: pointer; font-family: var(--font-ui); font-size: 11px; letter-spacing: 1px; color: var(--text-secondary); background: var(--bg-panel-2); border: none; transition: background 0.15s, color 0.15s; user-select: none; }
+    .style-btn.active { background: var(--accent); color: var(--bg-dark); font-weight: 500; }
+    .style-btn:not(.active):hover { background: var(--bg-panel); color: var(--text-primary); }
+
+    /* Layer rows */
+    .layer-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; cursor: pointer; user-select: none; }
+    .layer-row:hover .layer-label { color: var(--text-primary); }
+    .layer-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .layer-label { flex: 1; font-size: 12px; color: var(--text-secondary); transition: color 0.1s; }
+    .layer-count { font-size: 10px; color: var(--text-muted); min-width: 40px; text-align: right; }
+    .toggle-switch { width: 28px; height: 16px; border-radius: 8px; background: var(--bg-panel-2); border: 1px solid var(--border); position: relative; transition: background 0.2s, border-color 0.2s; flex-shrink: 0; }
+    .toggle-switch.on { background: var(--accent-dim); border-color: var(--accent); }
+    .toggle-switch::after { content: ''; position: absolute; width: 10px; height: 10px; border-radius: 50%; background: var(--text-muted); top: 2px; left: 2px; transition: transform 0.2s, background 0.2s; }
+    .toggle-switch.on::after { transform: translateX(12px); background: var(--accent); }
+
+    /* Add site button */
+    #add-site-btn { width: 100%; padding: 9px 0; background: transparent; border: 1px dashed var(--border); border-radius: 4px; color: var(--text-muted); font-family: var(--font-ui); font-size: 11px; letter-spacing: 1px; cursor: pointer; transition: border-color 0.15s, color 0.15s; }
+    #add-site-btn:hover, #add-site-btn.active { border-color: var(--accent); color: var(--accent); border-style: solid; }
+    #add-site-btn.active { background: rgba(232,168,56,0.06); }
+
+    /* Sites list */
+    #sites-list { flex: 1; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+
+    .site-list-item { display: flex; align-items: center; gap: 10px; padding: 10px 16px; cursor: pointer; border-bottom: 1px solid var(--border); transition: background 0.1s; }
+    .site-list-item:hover { background: var(--bg-panel-2); }
+    .site-list-item.selected { background: var(--bg-panel-2); border-left: 2px solid var(--accent); padding-left: 14px; }
+    .site-list-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .site-list-info { flex: 1; min-width: 0; }
+    .site-list-name { font-size: 12px; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .site-list-sub { font-size: 10px; color: var(--text-muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .site-list-empty { padding: 20px 16px; font-size: 11px; color: var(--text-muted); line-height: 1.7; }
+    .site-list-empty strong { color: var(--accent); display: block; font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 6px; }
+
+    /* ── Map ── */
+    #map { flex: 1; position: relative; }
+
+    /* Search */
+    #search-wrap { position: absolute; top: 16px; left: 16px; z-index: 20; width: 320px; }
+    #search-inner { position: relative; }
+    #search-input { width: 100%; height: 40px; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 4px; color: var(--text-primary); font-family: var(--font-ui); font-size: 12px; letter-spacing: 0.5px; padding: 0 40px 0 14px; outline: none; transition: border-color 0.15s, box-shadow 0.15s; }
+    #search-input::placeholder { color: var(--text-muted); }
+    #search-input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(232,168,56,0.12); }
+    #search-icon { position: absolute; right: 13px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 16px; pointer-events: none; }
+    #search-clear { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 14px; cursor: pointer; background: none; border: none; padding: 2px; display: none; font-family: var(--font-ui); }
+    #search-clear:hover { color: var(--text-primary); }
+    #search-results { margin-top: 4px; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; display: none; box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
+    .search-result-item { padding: 10px 14px; cursor: pointer; border-bottom: 1px solid var(--border); transition: background 0.1s; }
+    .search-result-item:last-child { border-bottom: none; }
+    .search-result-item:hover { background: var(--bg-panel-2); }
+    .search-result-name { font-size: 12px; color: var(--text-primary); }
+    .search-result-sub { font-size: 10px; color: var(--text-muted); margin-top: 3px; }
+    .search-status { padding: 10px 14px; font-size: 11px; color: var(--text-muted); }
+
+    /* Map controls */
+    #map-controls { position: absolute; top: 16px; right: 16px; display: flex; flex-direction: column; gap: 8px; z-index: 10; }
+    .map-ctrl-btn { width: 36px; height: 36px; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 4px; color: var(--text-secondary); font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: border-color 0.15s, color 0.15s; user-select: none; }
+    .map-ctrl-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .map-ctrl-btn.active-mode { border-color: var(--accent); color: var(--accent); background: rgba(232,168,56,0.08); }
+
+    /* Add mode banner */
+    #add-mode-banner { position: absolute; bottom: 48px; left: 50%; transform: translateX(-50%); background: var(--accent); color: var(--bg-dark); padding: 8px 20px; border-radius: 4px; font-size: 11px; letter-spacing: 1.5px; font-weight: 500; z-index: 20; display: none; pointer-events: none; white-space: nowrap; box-shadow: 0 4px 16px rgba(0,0,0,0.4); }
+
+    /* Coords */
+    #coords { position: absolute; bottom: 16px; right: 16px; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 4px; padding: 6px 10px; font-size: 10px; color: var(--text-muted); letter-spacing: 0.5px; z-index: 10; pointer-events: none; }
+
+    /* Custom map pins */
+    .map-pin { width: 20px; height: 20px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); border: 2px solid rgba(0,0,0,0.4); cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.5); transition: transform 0.15s; }
+    .map-pin:hover { transform: rotate(-45deg) scale(1.2); }
+    .map-pin.selected { transform: rotate(-45deg) scale(1.3); box-shadow: 0 0 0 3px rgba(232,168,56,0.5), 0 2px 8px rgba(0,0,0,0.5); }
+    .search-pin { width: 14px; height: 14px; background: #fff; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); border: 2px solid var(--bg-dark); box-shadow: 0 2px 8px rgba(0,0,0,0.6); }
+
+    /* ── Site record panel (right side) ── */
+    #site-panel { width: 320px; background: var(--bg-panel); border-left: 2px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; z-index: 10; transform: translateX(100%); transition: transform 0.25s ease, border-color 0.3s ease; overflow: hidden; }
+    #site-panel.open { transform: translateX(0); }
+    #site-panel.saved { border-left-color: var(--green); }
+
+    .site-panel-header { padding: 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; flex-shrink: 0; transition: border-color 0.3s; }
+    #site-panel.saved .site-panel-header { border-bottom-color: rgba(63,185,80,0.3); }
+    .site-panel-title { flex: 1; font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-muted); }
+    .site-panel-close { background: none; border: none; color: var(--text-muted); font-size: 18px; cursor: pointer; padding: 0 4px; line-height: 1; }
+    .site-panel-close:hover { color: var(--text-primary); }
+
+    .site-panel-body { flex: 1; overflow-y: auto; padding: 12px 16px; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+
+    .field-group { margin-bottom: 10px; }
+    .field-label { font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--text-muted); margin-bottom: 4px; display: block; }
+    .field-input { width: 100%; background: var(--bg-panel-2); border: 1px solid var(--border); border-radius: 4px; color: var(--text-primary); font-family: var(--font-ui); font-size: 12px; padding: 6px 10px; outline: none; transition: border-color 0.15s; }
+    .field-input:focus { border-color: var(--accent); }
+    .field-input::placeholder { color: var(--text-muted); }
+    textarea.field-input { resize: vertical; min-height: 48px; line-height: 1.5; }
+    select.field-input { cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23484f58'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; padding-right: 28px; }
+    select.field-input option { background: var(--bg-panel-2); }
+
+    .coord-row { display: flex; gap: 8px; }
+    .coord-row .field-input { font-size: 11px; }
+
+    /* Custom fields */
+    .custom-field-row { display: flex; gap: 6px; margin-bottom: 6px; align-items: center; }
+    .custom-field-row .field-input { flex: 1; }
+    .custom-field-del { background: none; border: none; color: var(--text-muted); font-size: 16px; cursor: pointer; padding: 0 4px; flex-shrink: 0; }
+    .custom-field-del:hover { color: var(--red); }
+    .add-custom-btn { background: none; border: 1px dashed var(--border); border-radius: 4px; color: var(--text-muted); font-family: var(--font-ui); font-size: 11px; letter-spacing: 1px; cursor: pointer; padding: 6px 10px; width: 100%; transition: border-color 0.15s, color 0.15s; }
+    .add-custom-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* Visit history */
+    .visit-entry { background: var(--bg-panel-2); border: 1px solid var(--border); border-radius: 4px; padding: 10px; margin-bottom: 8px; }
+    .visit-entry-date { font-size: 10px; color: var(--text-muted); margin-bottom: 4px; }
+    .visit-entry-status { font-size: 11px; margin-bottom: 4px; }
+    .visit-entry-notes { font-size: 11px; color: var(--text-secondary); line-height: 1.5; }
+    .status-badge { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 10px; letter-spacing: 1px; }
+    .status-badge.completed { background: rgba(63,185,80,0.15); color: var(--green); }
+    .status-badge.flagged { background: rgba(232,168,56,0.15); color: var(--accent); }
+    .status-badge.aborted { background: rgba(248,81,73,0.15); color: var(--red); }
+    .status-badge.not_visited { background: rgba(248,81,73,0.15); color: var(--red); }
+
+    .site-panel-footer { padding: 16px; border-top: 1px solid var(--border); display: flex; gap: 8px; flex-shrink: 0; }
+    .btn-primary { flex: 1; padding: 9px 0; background: var(--accent); border: none; border-radius: 4px; color: var(--bg-dark); font-family: var(--font-ui); font-size: 12px; letter-spacing: 1px; cursor: pointer; font-weight: 500; transition: background 0.15s; }
+    .btn-primary:hover { background: var(--accent-dim); }
+    .btn-secondary { padding: 9px 14px; background: transparent; border: 1px solid var(--border); border-radius: 4px; color: var(--text-secondary); font-family: var(--font-ui); font-size: 12px; letter-spacing: 0.5px; cursor: pointer; transition: border-color 0.15s, color 0.15s; }
+    .btn-secondary:hover { border-color: var(--red); color: var(--red); }
+    .btn-log { padding: 9px 14px; background: transparent; border: 1px solid var(--border); border-radius: 4px; color: var(--text-secondary); font-family: var(--font-ui); font-size: 11px; letter-spacing: 0.5px; cursor: pointer; transition: border-color 0.15s, color 0.15s; }
+    .btn-log:hover { border-color: var(--green); color: var(--green); }
+
+    /* Log visit mini form */
+    .log-form { background: var(--bg-panel-2); border: 1px solid var(--border); border-radius: 4px; padding: 12px; margin-bottom: 16px; }
+    .log-form-title { font-size: 10px; letter-spacing: 1.5px; color: var(--accent); text-transform: uppercase; margin-bottom: 10px; }
+
+    /* Status bar */
+    #statusbar { height: 28px; background: var(--bg-dark); border-top: 1px solid var(--border); display: flex; align-items: center; padding: 0 16px; gap: 20px; flex-shrink: 0; }
+    .status-item { font-size: 10px; color: var(--text-muted); letter-spacing: 0.5px; display: flex; align-items: center; gap: 6px; }
+    .status-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--green); }
+
+    /* Loading */
+    #loading { position: fixed; inset: 0; background: var(--bg-dark); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 1000; gap: 20px; transition: opacity 0.4s; }
+    #loading.hidden { opacity: 0; pointer-events: none; }
+    #loading-title { font-family: var(--font-display); font-size: 42px; letter-spacing: 6px; color: var(--accent); }
+    #loading-sub { font-size: 11px; color: var(--text-muted); letter-spacing: 3px; text-transform: uppercase; }
+    .loading-bar { width: 200px; height: 2px; background: var(--border); border-radius: 1px; overflow: hidden; }
+    .loading-bar-fill { height: 100%; background: var(--accent); animation: load 1.8s ease-in-out forwards; }
+    @keyframes load { from { width: 0%; } to { width: 100%; } }
+
+    .maplibregl-ctrl-attrib { background: rgba(13,17,23,0.8) !important; color: var(--text-muted) !important; font-family: var(--font-ui) !important; font-size: 9px !important; }
+    .maplibregl-ctrl-attrib a { color: var(--text-muted) !important; }
+
+    /* ── Operations panel ── */
+    #ops-panel { width: 360px; background: var(--bg-panel); border-left: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; z-index: 10; transform: translateX(100%); transition: transform 0.25s ease; overflow: hidden; position: absolute; right: 0; top: 0; bottom: 0; }
+    #ops-panel.open { transform: translateX(0); position: relative; }
+    #ops-panel-body { flex: 1; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+
+    /* Op list items */
+    .op-list-item { padding: 12px; border: 1px solid var(--border); border-radius: 4px; margin-bottom: 8px; cursor: pointer; transition: border-color 0.15s; }
+    .op-list-item:hover { border-color: var(--accent); }
+    .op-list-item.active-op { border-color: var(--accent); background: rgba(232,168,56,0.05); }
+    .op-list-name { font-size: 12px; color: var(--text-primary); margin-bottom: 4px; }
+    .op-list-meta { font-size: 10px; color: var(--text-muted); }
+
+    /* Day planner */
+    .day-tab-bar { display: flex; border-bottom: 1px solid var(--border); flex-shrink: 0; overflow-x: auto; }
+    .day-tab { padding: 10px 16px; font-size: 11px; letter-spacing: 1px; color: var(--text-muted); cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; transition: color 0.15s, border-color 0.15s; }
+    .day-tab:hover { color: var(--text-primary); }
+    .day-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+    .day-plan-area { padding: 12px 16px; }
+    .day-departure { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding: 8px 10px; background: var(--bg-panel-2); border: 1px solid var(--border); border-radius: 4px; }
+    .day-departure-label { font-size: 10px; color: var(--text-muted); letter-spacing: 1px; white-space: nowrap; }
+    .day-departure-input { flex: 1; background: none; border: none; color: var(--text-primary); font-family: var(--font-ui); font-size: 11px; outline: none; }
+
+    /* Site assignment drop zones */
+    .day-drop-zone { min-height: 60px; border: 1px dashed var(--border); border-radius: 4px; padding: 8px; margin-bottom: 12px; transition: border-color 0.15s, background 0.15s; }
+    .day-drop-zone.drag-over { border-color: var(--accent); background: rgba(232,168,56,0.05); }
+    .day-drop-zone-label { font-size: 10px; color: var(--text-muted); letter-spacing: 1px; margin-bottom: 6px; text-transform: uppercase; }
+
+    .assigned-site-card { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: var(--bg-panel-2); border: 1px solid var(--border); border-radius: 4px; margin-bottom: 6px; cursor: grab; user-select: none; }
+    .assigned-site-card:active { cursor: grabbing; opacity: 0.7; }
+    .assigned-site-num { width: 20px; height: 20px; border-radius: 50%; background: var(--accent); color: var(--bg-dark); font-size: 10px; font-weight: 600; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .assigned-site-info { flex: 1; min-width: 0; }
+    .assigned-site-name { font-size: 11px; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .assigned-site-drive { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+    .assigned-site-drive.override { color: var(--accent); }
+    .assigned-site-remove { background: none; border: none; color: var(--text-muted); font-size: 14px; cursor: pointer; padding: 0 2px; flex-shrink: 0; }
+    .assigned-site-remove:hover { color: var(--red); }
+
+    /* Unassigned sites pool */
+    .unassigned-pool { margin-top: 4px; }
+    .unassigned-pool-label { font-size: 10px; color: var(--text-muted); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 6px; }
+    .unassigned-site-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; background: var(--bg-panel-2); border: 1px solid var(--border); border-radius: 3px; margin: 0 4px 4px 0; cursor: grab; font-size: 11px; color: var(--text-secondary); user-select: none; transition: border-color 0.15s; }
+    .unassigned-site-chip:hover { border-color: var(--accent); color: var(--text-primary); }
+
+    /* Route summary */
+    .route-summary { background: var(--bg-panel-2); border: 1px solid var(--border); border-radius: 4px; padding: 10px 12px; margin-bottom: 12px; }
+    .route-summary-title { font-size: 10px; color: var(--text-muted); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 6px; }
+    .route-summary-stat { font-size: 11px; color: var(--text-primary); display: flex; justify-content: space-between; margin-bottom: 3px; }
+    .route-summary-stat span { color: var(--accent); }
+
+    .btn-route { width: 100%; padding: 8px 0; background: transparent; border: 1px solid var(--accent); border-radius: 4px; color: var(--accent); font-family: var(--font-ui); font-size: 11px; letter-spacing: 1px; cursor: pointer; transition: background 0.15s; margin-bottom: 8px; }
+    .btn-route:hover { background: rgba(232,168,56,0.08); }
+    .btn-route:disabled { border-color: var(--border); color: var(--text-muted); cursor: not-allowed; }
+
+    /* Drive time override */
+    .drive-override-input { width: 50px; background: var(--bg-panel); border: 1px solid var(--accent); border-radius: 3px; color: var(--accent); font-family: var(--font-ui); font-size: 10px; padding: 2px 4px; text-align: center; }
+
+    /* Divider */
+    .field-divider { border: none; border-top: 1px solid var(--border); margin: 10px 0; }
+  </style>
+</head>
+<body>
+
+<div id="loading">
+  <div id="loading-title">GEOINT</div>
+  <div id="loading-sub">Field Planning System — Victoria AU</div>
+  <div class="loading-bar"><div class="loading-bar-fill"></div></div>
+</div>
+
+<div id="app">
+  <div id="topbar">
+    <div id="logo">GEOINT <span>VICTORIA // FIELD OPS</span></div>
+    <div class="topbar-spacer"></div>
+    <button class="topbar-btn" id="btn-operations" onclick="toggleOperationsPanel()">OPERATIONS</button>
+    <button class="topbar-btn" onclick="alert('Change Log — Stage 5')">CHANGE LOG</button>
+    <button class="topbar-btn" onclick="alert('Export PDF — Stage 6')">EXPORT PDF</button>
+    <button class="topbar-btn" id="share-btn" onclick="copyShareLink()">SHARE LINK</button>
+  </div>
+
+  <div id="main">
+
+    <!-- Left panel -->
+    <div id="panel-left">
+
+      <div class="panel-section">
+        <div class="panel-section-title">Base Map</div>
+        <div class="style-toggle">
+          <div class="style-btn active" id="btn-satellite" onclick="setStyle('satellite')">SATELLITE</div>
+          <div class="style-btn" id="btn-street" onclick="setStyle('street')">STREET</div>
+        </div>
+      </div>
+
+      <div class="panel-section">
+        <div class="panel-section-title">Site Layers</div>
+        <div class="layer-row" onclick="toggleLayer('farms')">
+          <div class="layer-dot" style="background:var(--col-farms)"></div>
+          <div class="layer-label">Farms</div>
+          <div class="layer-count" id="count-farms">0 sites</div>
+          <div class="toggle-switch on" id="toggle-farms"></div>
+        </div>
+        <div class="layer-row" onclick="toggleLayer('processors')">
+          <div class="layer-dot" style="background:var(--col-processors)"></div>
+          <div class="layer-label">Meat Processors</div>
+          <div class="layer-count" id="count-processors">0 sites</div>
+          <div class="toggle-switch on" id="toggle-processors"></div>
+        </div>
+        <div class="layer-row" onclick="toggleLayer('residential')">
+          <div class="layer-dot" style="background:var(--col-residential)"></div>
+          <div class="layer-label">Residential</div>
+          <div class="layer-count" id="count-residential">0 sites</div>
+          <div class="toggle-switch on" id="toggle-residential"></div>
+        </div>
+        <div class="layer-row" onclick="toggleLayer('accommodation')">
+          <div class="layer-dot" style="background:var(--col-accommodation)"></div>
+          <div class="layer-label">Accommodation</div>
+          <div class="layer-count" id="count-accommodation">0 sites</div>
+          <div class="toggle-switch on" id="toggle-accommodation"></div>
+        </div>
+        <div class="layer-row" onclick="toggleLayer('cadastral')">
+          <div class="layer-dot" style="background:#a78bfa; border-radius:2px"></div>
+          <div class="layer-label">Cadastral Boundaries</div>
+          <div class="layer-count" id="cadastral-status">READY</div>
+          <div class="toggle-switch" id="toggle-cadastral"></div>
+        </div>
+        <div style="font-size:10px;color:var(--text-muted);padding:2px 0 6px 20px;line-height:1.4">Shows land parcels and buildings. Works best zoomed in.</div>
+      </div>
+
+      <div class="panel-section">
+        <button id="add-site-btn" onclick="toggleAddMode()">+ ADD SITE TO MAP</button>
+      </div>
+
+      <!-- Sites list -->
+      <div id="sites-list">
+        <div class="site-list-empty" id="sites-empty">
+          <strong>No sites yet</strong>
+          Click "+ ADD SITE TO MAP" then click anywhere on the map to place a site, or search for an address above.
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Map -->
+    <div id="map">
+      <div id="search-wrap">
+        <div id="search-inner">
+          <input type="text" id="search-input" placeholder="Search address or place..." autocomplete="off" spellcheck="false" />
+          <span id="search-icon">⌕</span>
+          <button id="search-clear" onclick="clearSearch()" title="Clear">✕</button>
+        </div>
+        <div id="search-results"></div>
+      </div>
+
+      <div id="map-controls">
+        <div class="map-ctrl-btn" title="Zoom in" onclick="map.zoomIn()">+</div>
+        <div class="map-ctrl-btn" title="Zoom out" onclick="map.zoomOut()">−</div>
+        <div class="map-ctrl-btn" title="Fit all sites" onclick="fitSites()" style="font-size:10px">ALL</div>
+        <div class="map-ctrl-btn" title="Fit Victoria" onclick="fitVictoria()" style="font-size:10px">VIC</div>
+      </div>
+
+      <div id="add-mode-banner">CLICK MAP TO PLACE SITE — ESC TO CANCEL</div>
+      <div id="coords">— , —</div>
+    </div>
+
+    <!-- Operations panel -->
+    <div id="ops-panel">
+      <div class="site-panel-header">
+        <div class="site-panel-title" id="ops-panel-title">OPERATIONS</div>
+        <button class="site-panel-close" onclick="toggleOperationsPanel()">✕</button>
+      </div>
+      <div id="ops-panel-body">
+        <div id="ops-list-view">
+          <div style="padding:16px">
+            <div class="panel-section-title" style="margin-bottom:12px">Active Operations</div>
+            <div id="ops-list"></div>
+            <button class="add-custom-btn" style="margin-top:8px" onclick="showNewOpForm()">+ NEW OPERATION</button>
+          </div>
+        </div>
+        <div id="ops-new-form" style="display:none;padding:16px">
+          <div class="panel-section-title" style="margin-bottom:12px">NEW OPERATION</div>
+          <div class="field-group">
+            <label class="field-label">Operation Name</label>
+            <input class="field-input" id="op-name" placeholder="e.g. Mildura Visit — June 2026" />
+          </div>
+          <div class="field-group">
+            <label class="field-label">Start Date</label>
+            <input class="field-input" id="op-start-date" type="date" />
+          </div>
+          <div class="field-group">
+            <label class="field-label">Number of Days</label>
+            <select class="field-input" id="op-days">
+              <option value="1">1 Day</option>
+              <option value="2">2 Days</option>
+              <option value="3" selected>3 Days</option>
+              <option value="4">4 Days</option>
+              <option value="5">5 Days</option>
+              <option value="7">7 Days</option>
+            </select>
+          </div>
+          <div class="field-group">
+            <label class="field-label">Departure Point (each day)</label>
+            <input class="field-input" id="op-departure" placeholder="e.g. Mildura CBD, 80 Deakin Ave" />
+          </div>
+          <div style="display:flex;gap:8px;margin-top:4px">
+            <button class="btn-primary" onclick="createOperation()" style="flex:1">CREATE</button>
+            <button class="btn-secondary" onclick="showOpsList()">CANCEL</button>
+          </div>
+        </div>
+        <div id="ops-day-planner" style="display:none">
+          <!-- Day planner rendered here -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Right site record panel -->
+    <div id="site-panel">
+      <div class="site-panel-header">
+        <div class="site-panel-title" id="site-panel-mode">New Site</div>
+        <div id="saved-badge" style="display:none; font-size:10px; letter-spacing:1px; color:var(--green); border:1px solid var(--green); border-radius:3px; padding:2px 8px;">SAVED ✓</div>
+        <button class="site-panel-close" onclick="closeSitePanel()">✕</button>
+      </div>
+
+      <div class="site-panel-body" id="site-panel-body">
+        <!-- Filled dynamically -->
+      </div>
+
+      <div class="site-panel-footer">
+        <button class="btn-secondary" id="btn-delete-site" onclick="deleteCurrentSite()" style="display:none">DELETE</button>
+        <button class="btn-log" id="btn-log-visit" onclick="toggleLogForm()" style="display:none">LOG VISIT</button>
+        <button class="btn-primary" onclick="saveSite()">SAVE SITE</button>
+      </div>
+    </div>
+
+  </div>
+
+  <div id="statusbar">
+    <div class="status-item"><div class="status-dot"></div>MAPTILER CONNECTED</div>
+    <div class="status-item">STAGE 2 — SITES</div>
+    <div class="status-item" id="status-zoom">ZOOM —</div>
+    <div class="status-item" id="status-sites">0 SITES</div>
+    <div class="status-item" id="status-ops">NO ACTIVE OP</div>
+    <div class="topbar-spacer"></div>
+    <div class="status-item">VICTORIA, AUSTRALIA</div>
+  </div>
+</div>
+
+<script>
+// ── Config ────────────────────────────────────────────────
+const MAPTILER_KEY = 'I39rdrcidN2X1czzRSmV';
+const STYLES = {
+  satellite: `https://api.maptiler.com/maps/satellite/style.json?key=${MAPTILER_KEY}`,
+  street:    `https://api.maptiler.com/maps/streets/style.json?key=${MAPTILER_KEY}`
+};
+const VIC_BOUNDS = [[140.9, -39.2], [150.0, -33.9]];
+const VIC_CENTER = [144.9631, -37.8136];
+
+const LAYER_COLORS = {
+  farms:         '#4ade80',
+  processors:    '#f87171',
+  residential:   '#60a5fa',
+  accommodation: '#fb923c'
+};
+
+const LAYER_LABELS = {
+  farms: 'Farm', processors: 'Meat Processor',
+  residential: 'Residential', accommodation: 'Accommodation'
+};
+
+// ── State ─────────────────────────────────────────────────
+// Clear stale data from pre-fix sessions
+const DATA_VERSION = '2';
+if (localStorage.getItem('geoint_data_version') !== DATA_VERSION) {
+  localStorage.removeItem('geoint_sites');
+  localStorage.setItem('geoint_data_version', DATA_VERSION);
+}
+let sites = JSON.parse(localStorage.getItem('geoint_sites') || '[]');
+let currentStyle  = 'satellite';
+let addMode       = false;
+let selectedSiteId = null;
+let editingNew    = false;
+let tempMarker    = null;
+let searchMarker  = null;
+let searchTimer   = null;
+let showLogForm   = false;
+let markers       = {}; // siteId -> maplibregl.Marker
+
+const layerState = {
+  farms: true, processors: true,
+  residential: true, accommodation: true, cadastral: false
+};
+
+// ── Map init ──────────────────────────────────────────────
+const map = new maplibregl.Map({
+  container: 'map',
+  style: STYLES.satellite,
+  center: VIC_CENTER,
+  zoom: 6,
+  maxBounds: [[130,-45],[160,-28]],
+  attributionControl: true
+});
+
+map.on('load', () => {
+  setTimeout(() => document.getElementById('loading').classList.add('hidden'), 600);
+  updateZoom();
+  renderAllMarkers();
+  initCadastralLayer();
+});
+
+map.on('mousemove', e => {
+  const { lng, lat } = e.lngLat;
+  document.getElementById('coords').textContent =
+    `${Math.abs(lat).toFixed(5)}°S  ${lng.toFixed(5)}°E`;
+});
+
+map.on('zoom', updateZoom);
+
+map.on('click', e => {
+  if (addMode) {
+    placeNewSite(e.lngLat.lng, e.lngLat.lat);
+  } else {
+    hideResults();
+  }
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    if (addMode) cancelAddMode();
+    else if (document.getElementById('search-input').value) clearSearch();
+  }
+});
+
+function updateZoom() {
+  document.getElementById('status-zoom').textContent = `ZOOM ${map.getZoom().toFixed(1)}`;
+}
+
+// ── Style switching ───────────────────────────────────────
+function setStyle(style) {
+  if (style === currentStyle) return;
+  currentStyle = style;
+  document.getElementById('btn-satellite').classList.toggle('active', style === 'satellite');
+  document.getElementById('btn-street').classList.toggle('active', style === 'street');
+  map.setStyle(STYLES[style]);
+  map.once('idle', redrawMarkers);
+}
+
+// ── Cadastral layer (Maptiler vector tiles) ──────────────
+// Uses landuse + building data already embedded in Maptiler's vector tiles.
+// No additional API calls — data is fetched as part of the map tiles.
+
+const CADASTRAL_LAYERS = [
+  {
+    id: 'cadastral-landuse-fill',
+    type: 'fill',
+    source: 'maptiler_planet',
+    'source-layer': 'landuse',
+    paint: {
+      'fill-color': '#a78bfa',
+      'fill-opacity': 0.08
+    }
+  },
+  {
+    id: 'cadastral-landuse-line',
+    type: 'line',
+    source: 'maptiler_planet',
+    'source-layer': 'landuse',
+    paint: {
+      'line-color': '#a78bfa',
+      'line-width': 1.0,
+      'line-opacity': 0.8
+    }
+  },
+  {
+    id: 'cadastral-building-fill',
+    type: 'fill',
+    source: 'maptiler_planet',
+    'source-layer': 'building',
+    paint: {
+      'fill-color': '#f59e0b',
+      'fill-opacity': 0.15
+    }
+  },
+  {
+    id: 'cadastral-building-line',
+    type: 'line',
+    source: 'maptiler_planet',
+    'source-layer': 'building',
+    paint: {
+      'line-color': '#f59e0b',
+      'line-width': 0.8,
+      'line-opacity': 0.9
+    }
+  },
+  {
+    id: 'cadastral-housenumber',
+    type: 'symbol',
+    source: 'maptiler_planet',
+    'source-layer': 'housenumber',
+    minzoom: 16,
+    layout: {
+      'text-field': ['get', 'housenumber'],
+      'text-font': ['Noto Sans Regular'],
+      'text-size': 11,
+      'text-variable-anchor': ['top', 'bottom', 'left', 'right', 'top-left', 'top-right', 'bottom-left', 'bottom-right'],
+      'text-radial-offset': 1.2,
+      'text-justify': 'auto',
+      'symbol-placement': 'point',
+      'text-allow-overlap': false,
+      'text-line-height': 1.2
+    },
+    paint: {
+      'text-color': '#f59e0b',
+      'text-halo-color': '#0d1117',
+      'text-halo-width': 2
+    }
+  },
+  {
+    id: 'cadastral-landuse-label',
+    type: 'symbol',
+    source: 'maptiler_planet',
+    'source-layer': 'landuse',
+    filter: ['has', 'name'],
+    minzoom: 14,
+    layout: {
+      'text-field': ['coalesce', ['get', 'name:en'], ['get', 'name']],
+      'text-font': ['Noto Sans Regular'],
+      'text-size': 11,
+      'text-variable-anchor': ['top', 'bottom', 'left', 'right', 'top-left', 'top-right', 'bottom-left', 'bottom-right'],
+      'text-radial-offset': 1.5,
+      'text-justify': 'auto',
+      'symbol-placement': 'point',
+      'text-allow-overlap': false,
+      'text-max-width': 10
+    },
+    paint: {
+      'text-color': '#c4b5fd',
+      'text-halo-color': '#0d1117',
+      'text-halo-width': 2
+    }
+  }
+];
+
+// ── Leader lines: centroid dot + dashed line + offset label ──
+// Uses querySourceFeatures() to get actual polygon geometry from tiles
+// then computes true centroids and builds explicit GeoJSON geometry
+
+function polygonCentroid(coords) {
+  if (!coords || !coords.length) return null;
+  let x = 0, y = 0, n = 0;
+  coords.forEach(c => { if (c && c.length >= 2) { x += c[0]; y += c[1]; n++; } });
+  return n ? [x / n, y / n] : null;
+}
+
+function getOffsetFromCentroid(centroid, zoom) {
+  // Offset distance scales with zoom — closer zoom = smaller offset in degrees
+  const deg = 0.0008 / Math.pow(2, zoom - 15);
+  return [centroid[0] + deg, centroid[1] + deg];
+}
+
+function ensureLeaderSource() {
+  if (!map.getSource('leader-lines-src')) {
+    map.addSource('leader-lines-src', {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: [] }
+    });
+  }
+  if (!map.getSource('leader-dots-src')) {
+    map.addSource('leader-dots-src', {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: [] }
+    });
+  }
+  if (!map.getSource('leader-labels-src')) {
+    map.addSource('leader-labels-src', {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: [] }
+    });
+  }
+
+  if (!map.getLayer('leader-line-layer')) {
+    map.addLayer({
+      id: 'leader-line-layer',
+      type: 'line',
+      source: 'leader-lines-src',
+      paint: {
+        'line-color': '#a78bfa',
+        'line-width': 1.2,
+        'line-opacity': 0.85,
+        'line-dasharray': [3, 3]
+      }
+    });
+  }
+
+  if (!map.getLayer('leader-dot-layer')) {
+    map.addLayer({
+      id: 'leader-dot-layer',
+      type: 'circle',
+      source: 'leader-dots-src',
+      paint: {
+        'circle-radius': 3,
+        'circle-color': '#a78bfa',
+        'circle-opacity': 0.9,
+        'circle-stroke-width': 1,
+        'circle-stroke-color': '#0d1117'
+      }
+    });
+  }
+
+  if (!map.getLayer('leader-label-layer')) {
+    map.addLayer({
+      id: 'leader-label-layer',
+      type: 'symbol',
+      source: 'leader-labels-src',
+      layout: {
+        'text-field': ['get', 'label'],
+        'text-font': ['Noto Sans Regular'],
+        'text-size': 11,
+        'text-anchor': 'bottom-left',
+        'text-allow-overlap': false,
+        'text-max-width': 10
+      },
+      paint: {
+        'text-color': '#e9d5ff',
+        'text-halo-color': '#0d1117',
+        'text-halo-width': 2
+      }
+    });
+  }
+}
+
+function buildLeaderLines() {
+  if (!layerState.cadastral) return;
+
+  const zoom = map.getZoom();
+  if (zoom < 14) {
+    ['leader-lines-src', 'leader-dots-src', 'leader-labels-src'].forEach(id => {
+      if (map.getSource(id)) map.getSource(id).setData({ type: 'FeatureCollection', features: [] });
+    });
+    return;
+  }
+
+  ensureLeaderSource();
+
+  // Query actual vector tile geometry for landuse polygons in current view
+  const style = map.getStyle();
+  const allSources = style.sources || {};
+  const sourceNames = Object.keys(allSources);
+
+  // Log ALL sources with their types
+  console.log('GEOINT SOURCES:', sourceNames.map(s => `${s}(${allSources[s].type})`).join(', '));
+
+  // Find all vector sources
+  const vectorSources = sourceNames.filter(s => allSources[s].type === 'vector');
+  console.log('GEOINT VECTOR SOURCES:', vectorSources);
+
+  // Try each vector source and log what source-layers it has
+  vectorSources.forEach(src => {
+    try {
+      const testFeatures = map.querySourceFeatures(src, { sourceLayer: 'landuse' });
+      console.log(`GEOINT ${src} landuse features:`, testFeatures.length);
+    } catch(e) {
+      console.log(`GEOINT ${src} landuse error:`, e.message);
+    }
+    try {
+      const testFeatures2 = map.querySourceFeatures(src, { sourceLayer: 'housenumber' });
+      console.log(`GEOINT ${src} housenumber features:`, testFeatures2.length);
+    } catch(e) {
+      console.log(`GEOINT ${src} housenumber error:`, e.message);
+    }
+    try {
+      const testFeatures3 = map.querySourceFeatures(src, { sourceLayer: 'place' });
+      console.log(`GEOINT ${src} place features:`, testFeatures3.length);
+    } catch(e) {
+      console.log(`GEOINT ${src} place error:`, e.message);
+    }
+  });
+
+  // Also log all layer source-layers from the style
+  const styleSourceLayers = [...new Set((style.layers || []).map(l => l['source-layer']).filter(Boolean))];
+  console.log('GEOINT STYLE SOURCE-LAYERS:', styleSourceLayers.join(', '));
+
+  // Pick the first vector source that has landuse data
+  let vectorSource = null;
+  let rawFeatures = [];
+
+  for (const src of vectorSources) {
+    try {
+      const test = map.querySourceFeatures(src, { sourceLayer: 'landuse' });
+      if (test.length > 0) {
+        vectorSource = src;
+        rawFeatures = test.filter(f => f.properties?.name);
+        console.log(`GEOINT: Using source "${src}" with ${rawFeatures.length} named landuse features`);
+        break;
+      }
+    } catch(e) { continue; }
+  }
+
+  // If no named landuse found, try without name filter
+  if (!rawFeatures.length && vectorSource) {
+    try {
+      rawFeatures = map.querySourceFeatures(vectorSource, { sourceLayer: 'landuse' });
+      console.log(`GEOINT: Fallback - ${rawFeatures.length} total landuse features (no name filter)`);
+    } catch(e) {}
+  }
+
+  if (!vectorSource) {
+    console.warn('GEOINT: No usable vector source found');
+    return;
+  }
+
+  // Also query housenumbers at high zoom
+  if (zoom >= 16) {
+    try {
+      const hn = map.querySourceFeatures(vectorSource, { sourceLayer: 'housenumber' });
+      rawFeatures = [...rawFeatures, ...hn];
+      console.log(`GEOINT: Added ${hn.length} housenumber features`);
+    } catch(e) { console.log('GEOINT housenumber error:', e.message); }
+  }
+
+  rawFeatures.forEach(f => {
+    if (!f.geometry) return;
+
+    const label = f.properties?.name || f.properties?.housenumber;
+    if (!label) return;
+
+    const key = `${label}-${JSON.stringify(f.geometry.coordinates).slice(0, 40)}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+
+    let centroid = null;
+    if (f.geometry.type === 'Polygon') {
+      centroid = polygonCentroid(f.geometry.coordinates[0]);
+    } else if (f.geometry.type === 'MultiPolygon') {
+      centroid = polygonCentroid(f.geometry.coordinates[0][0]);
+    } else if (f.geometry.type === 'Point') {
+      centroid = f.geometry.coordinates;
+    }
+    if (!centroid) return;
+
+    const labelPt = getOffsetFromCentroid(centroid, zoom);
+
+    // Dot at centroid
+    dotFeatures.push({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: centroid },
+      properties: {}
+    });
+
+    // Dashed line from centroid to label anchor
+    lineFeatures.push({
+      type: 'Feature',
+      geometry: { type: 'LineString', coordinates: [centroid, labelPt] },
+      properties: {}
+    });
+
+    // Label at offset point
+    labelFeatures.push({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: labelPt },
+      properties: { label: String(label) }
+    });
+  });
+
+  map.getSource('leader-lines-src').setData({ type: 'FeatureCollection', features: lineFeatures });
+  map.getSource('leader-dots-src').setData({ type: 'FeatureCollection', features: dotFeatures });
+  map.getSource('leader-labels-src').setData({ type: 'FeatureCollection', features: labelFeatures });
+
+  console.log(`GEOINT: Built ${lineFeatures.length} leader lines`);
+}
+
+function initCadastralLayer() {
+  const style = map.getStyle();
+  const sources = Object.keys(style.sources || {});
+  const allLayers = (style.layers || []).map(l => l['source-layer']).filter(Boolean);
+  const uniqueSourceLayers = [...new Set(allLayers)];
+
+  // Log for diagnostics
+  console.log('GEOINT DIAG — Sources:', sources);
+  console.log('GEOINT DIAG — Source-layers available:', uniqueSourceLayers);
+
+  // Show diagnostic in status
+  const statusEl = document.getElementById('cadastral-status');
+
+  // Find the vector tile source
+  const vectorSource = sources.find(s =>
+    s.includes('maptiler') || s.includes('planet') || s.includes('openmaptiles') || s.includes('v3')
+  ) || sources.find(s => {
+    const src = style.sources[s];
+    return src.type === 'vector';
+  });
+
+  console.log('GEOINT DIAG — Using source:', vectorSource);
+
+  if (!vectorSource) {
+    if (statusEl) { statusEl.textContent = 'NO SRC'; statusEl.style.color = 'var(--red)'; }
+    console.warn('GEOINT: No vector source found. Available sources:', sources);
+    return;
+  }
+
+  let added = 0;
+  let failed = [];
+
+  CADASTRAL_LAYERS.forEach(layerDef => {
+    if (map.getLayer(layerDef.id)) return;
+    try {
+      const layerToAdd = { ...layerDef, source: vectorSource };
+      if (!layerToAdd.layout) layerToAdd.layout = {};
+      layerToAdd.layout.visibility = 'none';
+      map.addLayer(layerToAdd);
+      added++;
+    } catch(e) {
+      failed.push(`${layerDef.id}: ${e.message}`);
+      console.warn('GEOINT layer add failed:', layerDef.id, e.message);
+    }
+  });
+
+  console.log(`GEOINT DIAG — Added ${added} layers. Failed: ${failed.length}`, failed);
+
+  if (statusEl) {
+    statusEl.textContent = added > 0 ? 'READY' : 'NO LAYERS';
+    statusEl.style.color = added > 0 ? 'var(--green)' : 'var(--red)';
+  }
+}
+
+function toggleCadastral() {
+  layerState.cadastral = !layerState.cadastral;
+  document.getElementById('toggle-cadastral').classList.toggle('on', layerState.cadastral);
+  const visibility = layerState.cadastral ? 'visible' : 'none';
+  const statusEl = document.getElementById('cadastral-status');
+
+  // Check if layers exist, if not init first
+  const hasLayers = CADASTRAL_LAYERS.some(l => map.getLayer(l.id));
+  if (!hasLayers) {
+    initCadastralLayer();
+    setTimeout(() => {
+      CADASTRAL_LAYERS.forEach(l => {
+        if (map.getLayer(l.id)) map.setLayoutProperty(l.id, 'visibility', visibility);
+      });
+    }, 200);
+  } else {
+    CADASTRAL_LAYERS.forEach(l => {
+      if (map.getLayer(l.id)) map.setLayoutProperty(l.id, 'visibility', visibility);
+    });
+  }
+
+  if (statusEl) {
+    statusEl.textContent = layerState.cadastral ? 'ON' : 'READY';
+    statusEl.style.color = layerState.cadastral ? 'var(--green)' : '';
+  }
+}
+
+// Re-init cadastral after style switch
+function redrawCadastral() {
+  // Remove old layers so they get re-added with correct source
+  CADASTRAL_LAYERS.forEach(l => {
+    if (map.getLayer(l.id)) map.removeLayer(l.id);
+  });
+  ['leader-line-layer', 'leader-dot-layer', 'leader-label-layer'].forEach(id => {
+    if (map.getLayer(id)) map.removeLayer(id);
+  });
+  ['leader-lines-src', 'leader-dots-src', 'leader-labels-src'].forEach(id => {
+    if (map.getSource(id)) map.removeSource(id);
+  });
+  initCadastralLayer();
+  if (layerState.cadastral) {
+    setTimeout(() => {
+      CADASTRAL_LAYERS.forEach(l => {
+        if (map.getLayer(l.id)) map.setLayoutProperty(l.id, 'visibility', 'visible');
+      });
+    }, 200);
+  }
+}
+
+// ── Layer toggling ────────────────────────────────────────
+function toggleLayer(name) {
+  if (name === 'cadastral') { toggleCadastral(); return; }
+  if (!LAYER_COLORS[name]) return;
+  layerState[name] = !layerState[name];
+  document.getElementById(`toggle-${name}`).classList.toggle('on', layerState[name]);
+  sites.filter(s => s.type === name).forEach(s => {
+    if (markers[s.id]) {
+      markers[s.id].getElement().style.display = layerState[name] ? 'block' : 'none';
+    }
+  });
+  renderSitesList();
+}
+
+// ── Add mode ──────────────────────────────────────────────
+function toggleAddMode() {
+  addMode ? cancelAddMode() : startAddMode();
+}
+
+function startAddMode() {
+  addMode = true;
+  map.getCanvas().style.cursor = 'crosshair';
+  document.getElementById('add-site-btn').classList.add('active');
+  document.getElementById('add-site-btn').textContent = '✕ CANCEL PLACEMENT';
+  document.getElementById('add-mode-banner').style.display = 'block';
+}
+
+function cancelAddMode() {
+  addMode = false;
+  map.getCanvas().style.cursor = '';
+  document.getElementById('add-site-btn').classList.remove('active');
+  document.getElementById('add-site-btn').textContent = '+ ADD SITE TO MAP';
+  document.getElementById('add-mode-banner').style.display = 'none';
+  if (tempMarker) { tempMarker.remove(); tempMarker = null; }
+}
+
+function placeNewSite(lng, lat) {
+  cancelAddMode();
+  // Clear search marker
+  if (searchMarker) { searchMarker.remove(); searchMarker = null; }
+
+  editingNew = true;
+  selectedSiteId = null;
+  showLogForm = false;
+
+  // Place a temporary draggable marker
+  const el = document.createElement('div');
+  el.className = 'map-pin';
+  el.style.background = '#aaa';
+
+  tempMarker = new maplibregl.Marker({ element: el, anchor: 'bottom', draggable: true })
+    .setLngLat([lng, lat])
+    .addTo(map);
+
+  tempMarker.on('drag', () => {
+    const pos = tempMarker.getLngLat();
+    document.getElementById('field-lng').value = pos.lng.toFixed(6);
+    document.getElementById('field-lat').value = pos.lat.toFixed(6);
+  });
+
+  openSitePanel({ lng, lat }, null);
+  // Reverse geocode to pre-fill address
+  reverseGeocode(lng, lat);
+}
+
+// ── Reverse geocode ───────────────────────────────────────
+async function reverseGeocode(lng, lat) {
+  try {
+    const url = `https://api.maptiler.com/geocoding/${lng},${lat}.json?key=${MAPTILER_KEY}&language=en`;
+    const res  = await fetch(url);
+    const data = await res.json();
+    if (data.features && data.features.length) {
+      const addr = data.features[0].place_name || '';
+      const nameEl = document.getElementById('field-name');
+      const addrEl = document.getElementById('field-address');
+      if (addrEl && !addrEl.value) addrEl.value = addr;
+      if (nameEl && !nameEl.value) nameEl.focus();
+    }
+  } catch { /* silent */ }
+}
+
+// ── Site panel ────────────────────────────────────────────
+function openSitePanel(lngLat, site) {
+  const panel    = document.getElementById('site-panel');
+  const body     = document.getElementById('site-panel-body');
+  const modeLabel = document.getElementById('site-panel-mode');
+  const btnDelete = document.getElementById('btn-delete-site');
+  const btnLog    = document.getElementById('btn-log-visit');
+
+  showLogForm = false;
+
+  // Reset saved state on panel open
+  document.getElementById('site-panel').classList.remove('saved');
+  document.getElementById('saved-badge').style.display = 'none';
+
+  if (site) {
+    modeLabel.textContent = 'Edit Site';
+    btnDelete.style.display = 'block';
+    btnLog.style.display    = 'block';
+  } else {
+    modeLabel.textContent = 'New Site';
+    btnDelete.style.display = 'none';
+    btnLog.style.display    = 'none';
+  }
+
+  const visits = site ? (site.visits || []) : [];
+  const customFields = site ? (site.customFields || []) : [];
+
+  body.innerHTML = `
+    <div class="field-group">
+      <label class="field-label">Site Name *</label>
+      <input class="field-input" id="field-name" placeholder="e.g. Smith Family Farm" value="${site ? esc(site.name) : ''}" oninput="markUnsaved()" />
+    </div>
+
+    <div class="field-group">
+      <label class="field-label">Site Type *</label>
+      <select class="field-input" id="field-type" onchange="updateTempMarkerColor(); markUnsaved()">
+        <option value="farms"         ${site?.type==='farms'         ? 'selected':''}>Farm</option>
+        <option value="processors"    ${site?.type==='processors'    ? 'selected':''}>Meat Processor</option>
+        <option value="residential"   ${site?.type==='residential'   ? 'selected':''}>Residential</option>
+        <option value="accommodation" ${site?.type==='accommodation' ? 'selected':''}>Accommodation</option>
+      </select>
+    </div>
+
+    <div class="field-group">
+      <label class="field-label">Address</label>
+      <input class="field-input" id="field-address" placeholder="Street address..." value="${site ? esc(site.address||'') : ''}" oninput="markUnsaved()" />
+    </div>
+
+    <div class="field-group">
+      <label class="field-label">Coordinates</label>
+      <div class="coord-row">
+        <input class="field-input" id="field-lat" placeholder="Latitude" value="${lngLat ? lngLat.lat.toFixed(6) : ''}" oninput="updateMarkerFromCoords()" />
+        <input class="field-input" id="field-lng" placeholder="Longitude" value="${lngLat ? lngLat.lng.toFixed(6) : ''}" oninput="updateMarkerFromCoords()" />
+      </div>
+      <div style="font-size:10px;color:var(--text-muted);margin-top:4px">Drag the pin on the map to adjust position</div>
+    </div>
+
+    <div class="field-group">
+      <label class="field-label">Notes / Observations</label>
+      <textarea class="field-input" id="field-notes" placeholder="Access instructions, observations, contact details..." oninput="markUnsaved()">${site ? esc(site.notes||'') : ''}</textarea>
+    </div>
+
+    <hr class="field-divider" />
+
+    <div class="field-group">
+      <label class="field-label">Custom Fields</label>
+      <div id="custom-fields-container">
+        ${customFields.map((cf, i) => `
+          <div class="custom-field-row" id="cf-row-${i}">
+            <input class="field-input" placeholder="Field name" value="${esc(cf.key)}" data-cf-key="${i}" />
+            <input class="field-input" placeholder="Value" value="${esc(cf.value)}" data-cf-val="${i}" />
+            <button class="custom-field-del" onclick="removeCustomField(${i})">✕</button>
+          </div>
+        `).join('')}
+      </div>
+      <button class="add-custom-btn" onclick="addCustomField()">+ ADD CUSTOM FIELD</button>
+    </div>
+
+    ${visits.length ? `
+      <hr class="field-divider" />
+      <div class="field-group">
+        <label class="field-label">Visit History (${visits.length})</label>
+        ${visits.slice().reverse().map(v => `
+          <div class="visit-entry">
+            <div class="visit-entry-date">${v.date} — ${v.by}</div>
+            <div class="visit-entry-status"><span class="status-badge ${v.status}">${({'not_visited':'NOT VISITED YET','completed':'COMPLETED','flagged':'FLAGGED FOR FOLLOW-UP','aborted':'ABORTED'})[v.status] || v.status.toUpperCase()}</span></div>
+            ${v.notes ? `<div class="visit-entry-notes">${esc(v.notes)}</div>` : ''}
+          </div>
+        `).join('')}
+      </div>
+    ` : ''}
+
+    ${site ? `
+      <div id="log-form-container"></div>
+    ` : ''}
+  `;
+
+  if (!site) updateTempMarkerColor();
+  panel.classList.add('open');
+
+  if (site) {
+    document.querySelectorAll('.site-list-item').forEach(el =>
+      el.classList.toggle('selected', el.dataset.id === site.id));
+  }
+}
+
+function closeSitePanel() {
+  document.getElementById('site-panel').classList.remove('open');
+  if (tempMarker) { tempMarker.remove(); tempMarker = null; }
+  editingNew = false;
+  selectedSiteId = null;
+  document.querySelectorAll('.site-list-item').forEach(el => el.classList.remove('selected'));
+  Object.values(markers).forEach(m => m.getElement().classList.remove('selected'));
+}
+
+// ── Temp marker color sync ────────────────────────────────
+function updateTempMarkerColor() {
+  if (!tempMarker) return;
+  const type = document.getElementById('field-type')?.value;
+  tempMarker.getElement().style.background = LAYER_COLORS[type] || '#aaa';
+}
+
+function updateMarkerFromCoords() {
+  const lat = parseFloat(document.getElementById('field-lat')?.value);
+  const lng = parseFloat(document.getElementById('field-lng')?.value);
+  if (!isNaN(lat) && !isNaN(lng)) {
+    if (tempMarker) tempMarker.setLngLat([lng, lat]);
+    else if (selectedSiteId && markers[selectedSiteId]) {
+      markers[selectedSiteId].setLngLat([lng, lat]);
+    }
+  }
+}
+
+// ── Custom fields ─────────────────────────────────────────
+function addCustomField() {
+  const container = document.getElementById('custom-fields-container');
+  const i = container.children.length;
+  const row = document.createElement('div');
+  row.className = 'custom-field-row';
+  row.id = `cf-row-${i}`;
+  row.innerHTML = `
+    <input class="field-input" placeholder="Field name" data-cf-key="${i}" />
+    <input class="field-input" placeholder="Value" data-cf-val="${i}" />
+    <button class="custom-field-del" onclick="this.closest('.custom-field-row').remove()">✕</button>
+  `;
+  container.appendChild(row);
+}
+
+function removeCustomField(i) {
+  document.getElementById(`cf-row-${i}`)?.remove();
+}
+
+function getCustomFields() {
+  const keys = document.querySelectorAll('[data-cf-key]');
+  const vals = document.querySelectorAll('[data-cf-val]');
+  const result = [];
+  keys.forEach((k, i) => {
+    if (k.value.trim()) result.push({ key: k.value.trim(), value: vals[i]?.value.trim() || '' });
+  });
+  return result;
+}
+
+// ── Save site ─────────────────────────────────────────────
+function saveSite() {
+  const name    = document.getElementById('field-name')?.value.trim();
+  const type    = document.getElementById('field-type')?.value;
+  const address = document.getElementById('field-address')?.value.trim();
+  const notes   = document.getElementById('field-notes')?.value.trim();
+  const lat     = parseFloat(document.getElementById('field-lat')?.value);
+  const lng     = parseFloat(document.getElementById('field-lng')?.value);
+  const customFields = getCustomFields();
+
+  if (!name) { alert('Please enter a site name.'); return; }
+  if (isNaN(lat) || isNaN(lng)) { alert('Invalid coordinates.'); return; }
+
+  if (editingNew && !selectedSiteId) {
+    // Create new site
+    const site = {
+      id: 'site_' + Date.now(),
+      name, type, address, notes, lat, lng,
+      customFields,
+      visits: [],
+      dateAdded: new Date().toISOString()
+    };
+    sites.push(site);
+    saveSites(); // write to localStorage immediately before any render
+    if (tempMarker) { tempMarker.remove(); tempMarker = null; }
+    addMarker(site);
+    selectedSiteId = site.id;
+    editingNew = false;
+    document.getElementById('site-panel-mode').textContent = 'Edit Site';
+    document.getElementById('btn-delete-site').style.display = 'block';
+    document.getElementById('btn-log-visit').style.display = 'block';
+  } else if (selectedSiteId) {
+    // Update existing
+    const site = sites.find(s => s.id === selectedSiteId);
+    if (site) {
+      site.name = name; site.type = type; site.address = address;
+      site.notes = notes; site.lat = lat; site.lng = lng;
+      site.customFields = customFields;
+      // Update marker position and color
+      if (markers[site.id]) {
+        markers[site.id].setLngLat([lng, lat]);
+        markers[site.id].getElement().style.background = LAYER_COLORS[type];
+      }
+    }
+  }
+
+  saveSites();
+  renderSitesList();
+  updateCounts();
+  flashSaveBtn();
+}
+
+function flashSaveBtn() {
+  const btn = document.querySelector('.btn-primary');
+  const panel = document.getElementById('site-panel');
+  const badge = document.getElementById('saved-badge');
+
+  // Set saved state
+  btn.textContent = 'SAVED ✓';
+  btn.style.background = 'var(--green)';
+  panel.classList.add('saved');
+  badge.style.display = 'block';
+
+  // Button reverts after 2s but panel stays green and badge stays
+  setTimeout(() => {
+    btn.textContent = 'SAVE SITE';
+    btn.style.background = '';
+  }, 2000);
+}
+
+function markUnsaved() {
+  const panel = document.getElementById('site-panel');
+  const badge = document.getElementById('saved-badge');
+  if (panel.classList.contains('saved')) {
+    panel.classList.remove('saved');
+    badge.style.display = 'none';
+  }
+}
+
+// ── Delete site ───────────────────────────────────────────
+function deleteCurrentSite() {
+  if (!selectedSiteId) return;
+  const site = sites.find(s => s.id === selectedSiteId);
+  if (!site) return;
+  if (!confirm(`Delete "${site.name}"? This cannot be undone.`)) return;
+  if (markers[selectedSiteId]) { markers[selectedSiteId].remove(); delete markers[selectedSiteId]; }
+  sites = sites.filter(s => s.id !== selectedSiteId);
+  saveSites();
+  closeSitePanel();
+  renderSitesList();
+  updateCounts();
+}
+
+// ── Log visit ─────────────────────────────────────────────
+function toggleLogForm() {
+  const container = document.getElementById('log-form-container');
+  if (!container) return;
+  showLogForm = !showLogForm;
+  if (showLogForm) {
+    const today = new Date().toISOString().split('T')[0];
+    container.innerHTML = `
+      <div class="log-form">
+        <div class="log-form-title">LOG VISIT</div>
+        <div class="field-group">
+          <label class="field-label">Date</label>
+          <input class="field-input" id="log-date" type="date" value="${today}" />
+        </div>
+        <div class="field-group">
+          <label class="field-label">Outcome</label>
+          <select class="field-input" id="log-status">
+            <option value="not_visited">Not Visited Yet</option>
+            <option value="completed">Completed</option>
+            <option value="flagged">Flagged for Follow-up</option>
+            <option value="aborted">Aborted</option>
+          </select>
+        </div>
+        <div class="field-group">
+          <label class="field-label">Visit Notes</label>
+          <textarea class="field-input" id="log-notes" placeholder="What happened, observations, next steps..."></textarea>
+        </div>
+        <button class="btn-primary" onclick="saveVisitLog()" style="width:100%">SAVE VISIT LOG</button>
+      </div>
+    `;
+  } else {
+    container.innerHTML = '';
+  }
+}
+
+function saveVisitLog() {
+  const site = sites.find(s => s.id === selectedSiteId);
+  if (!site) return;
+  const visit = {
+    date:   document.getElementById('log-date')?.value || '',
+    status: document.getElementById('log-status')?.value || 'completed',
+    notes:  document.getElementById('log-notes')?.value.trim() || '',
+    by:     'User'
+  };
+  site.visits = site.visits || [];
+  site.visits.push(visit);
+  saveSites();
+  // Reopen panel to refresh visit history
+  const lngLat = { lng: site.lng, lat: site.lat };
+  openSitePanel(lngLat, site);
+  selectedSiteId = site.id;
+  updateMarkerStatus(site);
+}
+
+function updateMarkerStatus(site) {
+  // Future: update pin indicator based on last visit status
+}
+
+// ── Markers ───────────────────────────────────────────────
+function addMarker(site) {
+  const el = document.createElement('div');
+  el.className = 'map-pin';
+  el.style.background = LAYER_COLORS[site.type] || '#aaa';
+  if (!layerState[site.type]) el.style.display = 'none';
+
+  el.addEventListener('click', e => {
+    e.stopPropagation();
+    selectSite(site.id);
+  });
+
+  const marker = new maplibregl.Marker({ element: el, anchor: 'bottom', draggable: true })
+    .setLngLat([site.lng, site.lat])
+    .addTo(map);
+
+  marker.on('dragend', () => {
+    const pos = marker.getLngLat();
+    const s = sites.find(s => s.id === site.id);
+    if (s) { s.lat = pos.lat; s.lng = pos.lng; saveSites(); }
+    if (selectedSiteId === site.id) {
+      document.getElementById('field-lat').value = pos.lat.toFixed(6);
+      document.getElementById('field-lng').value = pos.lng.toFixed(6);
+    }
+  });
+
+  markers[site.id] = marker;
+}
+
+function renderAllMarkers() {
+  // Called on initial map load — reads from localStorage
+  const stored = localStorage.getItem('geoint_sites');
+  if (stored) sites = JSON.parse(stored);
+  Object.values(markers).forEach(m => m.remove());
+  markers = {};
+  sites.forEach(addMarker);
+  renderSitesList();
+  updateCounts();
+}
+
+function redrawMarkers() {
+  // Called after style switch — uses in-memory sites, does NOT re-read localStorage
+  Object.values(markers).forEach(m => m.remove());
+  markers = {};
+  sites.forEach(addMarker);
+  // Restore layer visibility
+  Object.keys(LAYER_COLORS).forEach(type => {
+    sites.filter(s => s.type === type).forEach(s => {
+      if (markers[s.id]) {
+        markers[s.id].getElement().style.display = layerState[type] ? 'block' : 'none';
+      }
+    });
+  });
+  // Re-init cadastral layer after style switch
+  redrawCadastral();
+}
+
+function selectSite(id) {
+  selectedSiteId = id;
+  editingNew = false;
+  if (tempMarker) { tempMarker.remove(); tempMarker = null; }
+
+  const site = sites.find(s => s.id === id);
+  if (!site) return;
+
+  // Highlight marker
+  Object.entries(markers).forEach(([sid, m]) =>
+    m.getElement().classList.toggle('selected', sid === id));
+
+  openSitePanel({ lat: site.lat, lng: site.lng }, site);
+  map.flyTo({ center: [site.lng, site.lat], zoom: Math.max(map.getZoom(), 14), duration: 800 });
+}
+
+// ── Sites list panel ──────────────────────────────────────
+function renderSitesList() {
+  const list = document.getElementById('sites-list');
+
+  if (!sites.length) {
+    list.innerHTML = '';
+    const emptyEl = document.createElement('div');
+    emptyEl.className = 'site-list-empty';
+    emptyEl.id = 'sites-empty';
+    emptyEl.innerHTML = `<strong>No sites yet</strong>Click "+ ADD SITE TO MAP" then click anywhere on the map to place a site.`;
+    list.appendChild(emptyEl);
+    document.getElementById('status-sites').textContent = '0 SITES';
+    return;
+  }
+
+  list.innerHTML = '';
+  // Always show ALL sites in the list regardless of layer toggle state
+  sites.forEach(site => {
+    const isHidden = !layerState[site.type];
+    const item = document.createElement('div');
+    item.className = 'site-list-item' + (site.id === selectedSiteId ? ' selected' : '');
+    item.dataset.id = site.id;
+    item.innerHTML = `
+      <div class="site-list-dot" style="background:${isHidden ? 'var(--text-muted)' : LAYER_COLORS[site.type]}"></div>
+      <div class="site-list-info">
+        <div class="site-list-name" style="color:${isHidden ? 'var(--text-muted)' : 'var(--text-primary)'}">${esc(site.name)}</div>
+        <div class="site-list-sub">${LAYER_LABELS[site.type]}${site.address ? ' · ' + esc(site.address) : ''}${isHidden ? ' · <em>hidden</em>' : ''}</div>
+      </div>
+    `;
+    item.addEventListener('click', () => selectSite(site.id));
+    list.appendChild(item);
+  });
+
+  document.getElementById('status-sites').textContent = `${sites.length} SITE${sites.length !== 1 ? 'S' : ''}`;
+}
+
+function updateCounts() {
+  Object.keys(LAYER_COLORS).forEach(type => {
+    const count = sites.filter(s => s.type === type).length;
+    const el = document.getElementById(`count-${type}`);
+    if (el) el.textContent = `${count} site${count !== 1 ? 's' : ''}`;
+  });
+}
+
+// ── Navigation ────────────────────────────────────────────
+function fitVictoria() {
+  map.fitBounds(VIC_BOUNDS, { padding: 40, duration: 1000 });
+}
+
+function fitSites() {
+  if (!sites.length) { fitVictoria(); return; }
+  const lngs = sites.map(s => s.lng);
+  const lats = sites.map(s => s.lat);
+  map.fitBounds(
+    [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
+    { padding: 80, duration: 1000 }
+  );
+}
+
+// ── Persistence ───────────────────────────────────────────
+function saveSites() {
+  localStorage.setItem('geoint_sites', JSON.stringify(sites));
+}
+
+// ── Address search ────────────────────────────────────────
+const searchInput   = document.getElementById('search-input');
+const searchResults = document.getElementById('search-results');
+const searchIcon    = document.getElementById('search-icon');
+const searchClear   = document.getElementById('search-clear');
+
+searchInput.addEventListener('input', () => {
+  const q = searchInput.value.trim();
+  searchClear.style.display = q ? 'block' : 'none';
+  searchIcon.style.display  = q ? 'none'  : 'block';
+  clearTimeout(searchTimer);
+  if (q.length < 3) { hideResults(); return; }
+  showStatus('Searching...');
+  searchTimer = setTimeout(() => geocode(q), 380);
+});
+
+searchInput.addEventListener('keydown', e => { if (e.key === 'Escape') clearSearch(); });
+document.getElementById('search-wrap').addEventListener('click', e => e.stopPropagation());
+
+async function geocode(query) {
+  const bbox = '140.9,-39.2,150.0,-33.9';
+  const url  = `https://api.maptiler.com/geocoding/${encodeURIComponent(query)}.json?key=${MAPTILER_KEY}&bbox=${bbox}&language=en&limit=6`;
+  try {
+    const res  = await fetch(url);
+    const data = await res.json();
+    renderResults(data.features || []);
+  } catch { showStatus('Search unavailable.'); }
+}
+
+function renderResults(features) {
+  if (!features.length) { showStatus('No results found.'); return; }
+  searchResults.innerHTML = '';
+  searchResults.style.display = 'block';
+  features.forEach(f => {
+    const name = f.text || f.place_name || 'Unknown';
+    const full = f.place_name || '';
+    const sub  = full.startsWith(name) ? full.slice(name.length).replace(/^,\s*/,'') : full;
+    const item = document.createElement('div');
+    item.className = 'search-result-item';
+    item.innerHTML = `<div class="search-result-name">${name}</div>${sub ? `<div class="search-result-sub">${sub}</div>` : ''}`;
+    item.addEventListener('click', () => selectSearchResult(f, name));
+    searchResults.appendChild(item);
+  });
+}
+
+function selectSearchResult(feature, name) {
+  hideResults();
+  searchInput.value = feature.place_name || name;
+  searchClear.style.display = 'block';
+  searchIcon.style.display = 'none';
+  const [lng, lat] = feature.center;
+  if (searchMarker) { searchMarker.remove(); searchMarker = null; }
+  const el = document.createElement('div');
+  el.className = 'search-pin';
+  searchMarker = new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat([lng, lat]).addTo(map);
+  const type = (feature.place_type || []).join(',');
+  const zoom = type.includes('address') || type.includes('poi') ? 17 : feature.bbox ? null : 14;
+  if (zoom) map.flyTo({ center: [lng, lat], zoom, duration: 1200 });
+  else if (feature.bbox) map.fitBounds(feature.bbox, { padding: 80, duration: 1200 });
+  else map.flyTo({ center: [lng, lat], zoom: 14, duration: 1200 });
+}
+
+function showStatus(msg) {
+  searchResults.style.display = 'block';
+  searchResults.innerHTML = `<div class="search-status">${msg}</div>`;
+}
+
+function hideResults() {
+  searchResults.style.display = 'none';
+  searchResults.innerHTML = '';
+}
+
+function clearSearch() {
+  searchInput.value = '';
+  searchIcon.style.display = 'block';
+  searchClear.style.display = 'none';
+  hideResults();
+  if (searchMarker) { searchMarker.remove(); searchMarker = null; }
+  searchInput.focus();
+}
+
+// ── Share link ────────────────────────────────────────────
+function copyShareLink() {
+  navigator.clipboard.writeText(window.location.href).then(() => {
+    const btn = document.getElementById('share-btn');
+    btn.textContent = 'COPIED ✓';
+    btn.style.borderColor = 'var(--green)';
+    btn.style.color = 'var(--green)';
+    setTimeout(() => { btn.textContent = 'SHARE LINK'; btn.style.borderColor = ''; btn.style.color = ''; }, 2000);
+  });
+}
+
+// ── Utility ───────────────────────────────────────────────
+function esc(str) {
+  return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ══════════════════════════════════════════════════════════
+// STAGE 4 — OPERATIONS AND ROUTING
+// ══════════════════════════════════════════════════════════
+
+let operations      = JSON.parse(localStorage.getItem('geoint_ops') || '[]');
+let activeOpId      = localStorage.getItem('geoint_active_op') || null;
+let activeDayIndex  = 0;
+let routeMarkers    = {};
+let dragSiteId      = null;
+let dragFromDay     = null; // null = unassigned
+
+function saveOps() {
+  localStorage.setItem('geoint_ops', JSON.stringify(operations));
+  localStorage.setItem('geoint_active_op', activeOpId || '');
+}
+
+function getActiveOp() {
+  return operations.find(o => o.id === activeOpId) || null;
+}
+
+// ── Panel toggle ─────────────────────────────────────────
+function toggleOperationsPanel() {
+  const panel = document.getElementById('ops-panel');
+  const isOpen = panel.classList.contains('open');
+  // Close site panel if open
+  document.getElementById('site-panel').classList.remove('open');
+  panel.classList.toggle('open', !isOpen);
+  if (!isOpen) {
+    renderOpsList();
+    const op = getActiveOp();
+    if (op) showDayPlanner(op);
+  }
+}
+
+// ── Operations list ───────────────────────────────────────
+function showOpsList() {
+  document.getElementById('ops-list-view').style.display = 'block';
+  document.getElementById('ops-new-form').style.display = 'none';
+  document.getElementById('ops-day-planner').style.display = 'none';
+  document.getElementById('ops-panel-title').textContent = 'OPERATIONS';
+  renderOpsList();
+}
+
+function showNewOpForm() {
+  document.getElementById('ops-list-view').style.display = 'none';
+  document.getElementById('ops-new-form').style.display = 'block';
+  document.getElementById('ops-day-planner').style.display = 'none';
+  document.getElementById('ops-panel-title').textContent = 'NEW OPERATION';
+  // Set default date to today
+  document.getElementById('op-start-date').value = new Date().toISOString().split('T')[0];
+}
+
+function renderOpsList() {
+  const list = document.getElementById('ops-list');
+  if (!operations.length) {
+    list.innerHTML = `<div style="font-size:11px;color:var(--text-muted);line-height:1.7;padding:4px 0">
+      No operations yet. Create one to start planning multi-day visits.
+    </div>`;
+    return;
+  }
+  list.innerHTML = operations.map(op => `
+    <div class="op-list-item ${op.id === activeOpId ? 'active-op' : ''}" onclick="selectOperation('${op.id}')">
+      <div class="op-list-name">${esc(op.name)}</div>
+      <div class="op-list-meta">${op.days} day${op.days>1?'s':''} · ${op.startDate} · ${countAssigned(op)} of ${sites.length} sites assigned</div>
+      <div style="display:flex;gap:6px;margin-top:8px">
+        <button class="btn-route" style="margin:0;flex:1;padding:5px 0;font-size:10px" onclick="event.stopPropagation();selectOperation('${op.id}')">OPEN PLANNER</button>
+        <button class="btn-secondary" style="padding:5px 10px;font-size:10px" onclick="event.stopPropagation();archiveOp('${op.id}')">ARCHIVE</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function countAssigned(op) {
+  return sites.filter(s => {
+    for (let d = 0; d < op.days; d++) {
+      if ((op.dayAssignments[d] || []).includes(s.id)) return true;
+    }
+    return false;
+  }).length;
+}
+
+function createOperation() {
+  const name      = document.getElementById('op-name').value.trim();
+  const startDate = document.getElementById('op-start-date').value;
+  const days      = parseInt(document.getElementById('op-days').value);
+  const departure = document.getElementById('op-departure').value.trim();
+
+  if (!name) { alert('Please enter an operation name.'); return; }
+  if (!startDate) { alert('Please select a start date.'); return; }
+
+  const op = {
+    id:             'op_' + Date.now(),
+    name,
+    startDate,
+    days,
+    departure,
+    dayAssignments: Array.from({ length: days }, () => []),
+    dayDepartures:  Array.from({ length: days }, () => departure),
+    routes:         Array.from({ length: days }, () => null),
+    overrides:      Array.from({ length: days }, () => ({}))
+  };
+
+  operations.push(op);
+  activeOpId = op.id;
+  saveOps();
+  selectOperation(op.id);
+}
+
+function selectOperation(id) {
+  activeOpId = id;
+  saveOps();
+  const op = getActiveOp();
+  if (!op) return;
+  activeDayIndex = 0;
+  showDayPlanner(op);
+}
+
+function archiveOp(id) {
+  if (!confirm('Archive this operation? It will be hidden from the main list.')) return;
+  operations = operations.filter(o => o.id !== id);
+  if (activeOpId === id) activeOpId = null;
+  saveOps();
+  renderOpsList();
+  clearRouteFromMap();
+}
+
+// ── Day planner ───────────────────────────────────────────
+function showDayPlanner(op) {
+  document.getElementById('ops-list-view').style.display = 'none';
+  document.getElementById('ops-new-form').style.display = 'none';
+  const planner = document.getElementById('ops-day-planner');
+  planner.style.display = 'block';
+  document.getElementById('ops-panel-title').textContent = esc(op.name).toUpperCase();
+  renderDayPlanner(op);
+}
+
+function renderDayPlanner(op) {
+  const planner = document.getElementById('ops-day-planner');
+
+  // Build day tabs
+  const tabs = Array.from({ length: op.days }, (_, i) => {
+    const date = getDayDate(op.startDate, i);
+    return `<div class="day-tab ${i === activeDayIndex ? 'active' : ''}" onclick="switchDay(${i})">${getDayLabel(op.startDate, i)}</div>`;
+  }).join('');
+
+  // Get assigned sites for active day
+  const assigned = (op.dayAssignments[activeDayIndex] || [])
+    .map(id => sites.find(s => s.id === id))
+    .filter(Boolean);
+
+  // Get unassigned sites
+  const allAssigned = new Set(op.dayAssignments.flat());
+  const unassigned = sites.filter(s => !allAssigned.has(s.id));
+
+  // Route for active day
+  const route = op.routes[activeDayIndex];
+  const overrides = op.overrides[activeDayIndex] || {};
+
+  const departure = op.dayDepartures[activeDayIndex] || op.departure || '';
+
+  planner.innerHTML = `
+    <div class="day-tab-bar">${tabs}
+      <div class="day-tab" onclick="showOpsList()" style="margin-left:auto;color:var(--text-muted)">← OPS</div>
+    </div>
+
+    <div class="day-plan-area" style="overflow-y:auto;max-height:calc(100vh - 200px)">
+
+      <div class="day-departure">
+        <span class="day-departure-label">DEPART</span>
+        <input class="day-departure-input" id="day-departure-input"
+          placeholder="Departure address..."
+          value="${esc(departure)}"
+          onchange="updateDeparture(this.value)"
+        />
+      </div>
+
+      ${route ? `
+      <div class="route-summary">
+        <div class="route-summary-title">DAY ${activeDayIndex+1} ROUTE SUMMARY</div>
+        <div class="route-summary-stat">Total stops <span>${assigned.length}</span></div>
+        <div class="route-summary-stat">Est. drive time <span>${route.totalTime}</span></div>
+        <div class="route-summary-stat">Total distance <span>${route.totalDist}</span></div>
+      </div>` : ''}
+
+      <button class="btn-route" onclick="calculateRoute()" ${assigned.length < 1 ? 'disabled' : ''}>
+        ${route ? '↺ RECALCULATE ROUTE' : '⟶ CALCULATE ROUTE'}
+      </button>
+
+      <div class="day-drop-zone" id="drop-zone-day"
+        ondragover="onDragOver(event,'day')"
+        ondragleave="onDragLeave(event,'day')"
+        ondrop="onDrop(event,${activeDayIndex})">
+        <div class="day-drop-zone-label">Day ${activeDayIndex+1} Sites ${assigned.length ? '('+assigned.length+')' : '— drag sites here'}</div>
+        ${assigned.map((site, idx) => {
+          const leg = route ? route.legs[idx] : null;
+          const overrideKey = `${idx}`;
+          const hasOverride = overrides[overrideKey];
+          const driveTime = hasOverride
+            ? `<span class="override">✏ ${overrides[overrideKey]} min (manual)</span>`
+            : leg ? `${Math.round(leg.duration/60)} min · ${(leg.distance/1000).toFixed(1)} km` : '—';
+          return `
+            <div class="assigned-site-card"
+              draggable="true"
+              ondragstart="onDragStart(event,'${site.id}',${activeDayIndex})"
+              ondragend="onDragEnd(event)">
+              <div class="assigned-site-num">${idx+1}</div>
+              <div class="assigned-site-info">
+                <div class="assigned-site-name">${esc(site.name)}</div>
+                <div class="assigned-site-drive ${hasOverride ? 'override' : ''}">
+                  ${idx === 0 ? 'First stop' : driveTime}
+                  ${idx > 0 ? `<input class="drive-override-input" title="Override drive time (min)"
+                    placeholder="min"
+                    value="${hasOverride ? overrides[overrideKey] : ''}"
+                    onchange="setTimeOverride(${idx}, this.value)"
+                    onclick="event.stopPropagation()"
+                    style="margin-left:6px" />` : ''}
+                </div>
+              </div>
+              <button class="assigned-site-remove" onclick="removeSiteFromDay('${site.id}',${activeDayIndex})" title="Remove from day">✕</button>
+            </div>
+          `;
+        }).join('')}
+        ${!assigned.length ? '<div style="font-size:11px;color:var(--text-muted);padding:8px 4px">Drag sites from the pool below</div>' : ''}
+      </div>
+
+      <div class="unassigned-pool">
+        <div class="unassigned-pool-label">Unassigned Sites (${unassigned.length})</div>
+        <div id="unassigned-chips"
+          ondragover="onDragOver(event,'unassigned')"
+          ondragleave="onDragLeave(event,'unassigned')"
+          ondrop="onDrop(event,null)">
+          ${unassigned.map(site => `
+            <div class="unassigned-site-chip"
+              draggable="true"
+              ondragstart="onDragStart(event,'${site.id}',null)"
+              ondragend="onDragEnd(event)">
+              <div style="width:8px;height:8px;border-radius:50%;background:${LAYER_COLORS[site.type]};flex-shrink:0"></div>
+              ${esc(site.name)}
+            </div>
+          `).join('')}
+          ${!unassigned.length ? '<div style="font-size:11px;color:var(--text-muted)">All sites assigned</div>' : ''}
+        </div>
+      </div>
+
+    </div>
+  `;
+
+  // Draw route on map if it exists
+  if (route) drawRouteOnMap(route, assigned);
+}
+
+function getDayDate(startDate, index) {
+  const d = new Date(startDate);
+  d.setDate(d.getDate() + index);
+  return d.toISOString().split('T')[0];
+}
+
+function getDayLabel(startDate, index) {
+  const d = new Date(startDate);
+  d.setDate(d.getDate() + index);
+  const days = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
+  return `DAY ${index+1} · ${days[d.getDay()]}`;
+}
+
+function switchDay(index) {
+  activeDayIndex = index;
+  const op = getActiveOp();
+  if (op) renderDayPlanner(op);
+  clearRouteFromMap();
+  const route = op?.routes[activeDayIndex];
+  const assigned = (op?.dayAssignments[activeDayIndex] || [])
+    .map(id => sites.find(s => s.id === id)).filter(Boolean);
+  if (route) drawRouteOnMap(route, assigned);
+}
+
+function updateDeparture(val) {
+  const op = getActiveOp();
+  if (!op) return;
+  op.dayDepartures[activeDayIndex] = val;
+  op.routes[activeDayIndex] = null; // clear cached route
+  saveOps();
+}
+
+// ── Drag and drop ─────────────────────────────────────────
+function onDragStart(event, siteId, fromDay) {
+  dragSiteId  = siteId;
+  dragFromDay = fromDay;
+  event.dataTransfer.effectAllowed = 'move';
+}
+
+function onDragEnd(event) {
+  dragSiteId  = null;
+  dragFromDay = null;
+  document.querySelectorAll('.day-drop-zone, #unassigned-chips').forEach(el => el.classList.remove('drag-over'));
+}
+
+function onDragOver(event, zone) {
+  event.preventDefault();
+  event.dataTransfer.dropEffect = 'move';
+  event.currentTarget.classList.add('drag-over');
+}
+
+function onDragLeave(event, zone) {
+  event.currentTarget.classList.remove('drag-over');
+}
+
+function onDrop(event, targetDay) {
+  event.preventDefault();
+  event.currentTarget.classList.remove('drag-over');
+  if (!dragSiteId) return;
+
+  const op = getActiveOp();
+  if (!op) return;
+
+  // Remove from source day
+  if (dragFromDay !== null) {
+    op.dayAssignments[dragFromDay] = op.dayAssignments[dragFromDay].filter(id => id !== dragSiteId);
+    op.routes[dragFromDay] = null;
+  }
+
+  // Add to target day
+  if (targetDay !== null) {
+    if (!op.dayAssignments[targetDay]) op.dayAssignments[targetDay] = [];
+    if (!op.dayAssignments[targetDay].includes(dragSiteId)) {
+      op.dayAssignments[targetDay].push(dragSiteId);
+    }
+    op.routes[targetDay] = null;
+  }
+
+  saveOps();
+  renderDayPlanner(op);
+}
+
+function removeSiteFromDay(siteId, dayIndex) {
+  const op = getActiveOp();
+  if (!op) return;
+  op.dayAssignments[dayIndex] = op.dayAssignments[dayIndex].filter(id => id !== siteId);
+  op.routes[dayIndex] = null;
+  saveOps();
+  renderDayPlanner(op);
+}
+
+// ── Drive time override ───────────────────────────────────
+function setTimeOverride(legIndex, value) {
+  const op = getActiveOp();
+  if (!op) return;
+  const key = String(legIndex);
+  if (value && !isNaN(parseInt(value))) {
+    op.overrides[activeDayIndex][key] = parseInt(value);
+  } else {
+    delete op.overrides[activeDayIndex][key];
+  }
+  saveOps();
+}
+
+// ── Routing ───────────────────────────────────────────────
+async function calculateRoute() {
+  const op = getActiveOp();
+  if (!op) return;
+
+  const assigned = (op.dayAssignments[activeDayIndex] || [])
+    .map(id => sites.find(s => s.id === id))
+    .filter(Boolean);
+
+  if (!assigned.length) return;
+
+  const btn = document.querySelector('.btn-route');
+  if (btn) { btn.textContent = 'CALCULATING...'; btn.disabled = true; }
+
+  // Geocode departure point if set
+  let departureCoords = null;
+  const departure = op.dayDepartures[activeDayIndex] || op.departure;
+  if (departure) {
+    try {
+      const geo = await fetch(
+        `https://api.maptiler.com/geocoding/${encodeURIComponent(departure)}.json?key=${MAPTILER_KEY}&bbox=140.9,-39.2,150.0,-33.9&limit=1`
+      );
+      const geoData = await geo.json();
+      if (geoData.features?.length) {
+        departureCoords = geoData.features[0].center;
+      }
+    } catch(e) { console.warn('Departure geocode failed', e); }
+  }
+
+  // Build waypoints: departure + assigned sites
+  const waypoints = [
+    ...(departureCoords ? [departureCoords] : []),
+    ...assigned.map(s => [s.lng, s.lat])
+  ];
+
+  if (waypoints.length < 2) {
+    if (btn) { btn.textContent = '⟶ CALCULATE ROUTE'; btn.disabled = false; }
+    alert('Need at least 2 points to calculate a route.');
+    return;
+  }
+
+  // Call Maptiler Directions API
+  const coords = waypoints.map(w => `${w[0]},${w[1]}`).join(';');
+  const url = `https://api.maptiler.com/directions/v2/driving/${coords}?key=${MAPTILER_KEY}&overview=full&geometries=geojson&steps=false`;
+
+  try {
+    const res  = await fetch(url);
+    const data = await res.json();
+
+    if (!data.routes?.length) throw new Error('No route returned');
+
+    const route = data.routes[0];
+    const legs  = route.legs || [];
+
+    // Total time and distance
+    const totalSeconds = legs.reduce((sum, l) => sum + l.duration, 0);
+    const totalMetres  = legs.reduce((sum, l) => sum + l.distance, 0);
+
+    const totalTime = formatDuration(totalSeconds);
+    const totalDist = `${(totalMetres/1000).toFixed(1)} km`;
+
+    // Store route
+    op.routes[activeDayIndex] = {
+      geometry: route.geometry,
+      legs,
+      totalTime,
+      totalDist
+    };
+
+    saveOps();
+    renderDayPlanner(op);
+    drawRouteOnMap(op.routes[activeDayIndex], assigned);
+
+  } catch(err) {
+    console.warn('Routing error:', err);
+    alert('Could not calculate route. Check your internet connection and try again.');
+    if (btn) { btn.textContent = '⟶ CALCULATE ROUTE'; btn.disabled = false; }
+  }
+}
+
+function formatDuration(seconds) {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.round((seconds % 3600) / 60);
+  return h ? `${h}h ${m}min` : `${m} min`;
+}
+
+// ── Route drawing ─────────────────────────────────────────
+function drawRouteOnMap(route, assigned) {
+  clearRouteFromMap();
+  if (!route?.geometry) return;
+
+  // Add route line
+  if (!map.getSource('route-source')) {
+    map.addSource('route-source', { type: 'geojson', data: route.geometry });
+  } else {
+    map.getSource('route-source').setData(route.geometry);
+  }
+
+  if (!map.getLayer('route-line')) {
+    map.addLayer({
+      id: 'route-line',
+      type: 'line',
+      source: 'route-source',
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: {
+        'line-color': '#e8a838',
+        'line-width': 3,
+        'line-opacity': 0.85
+      }
+    });
+  }
+
+  // Add numbered stop markers over existing site pins
+  assigned.forEach((site, idx) => {
+    const el = document.createElement('div');
+    el.style.cssText = `
+      width:24px;height:24px;border-radius:50%;
+      background:var(--accent);color:#0d1117;
+      font-family:var(--font-ui);font-size:11px;font-weight:600;
+      display:flex;align-items:center;justify-content:center;
+      border:2px solid #0d1117;box-shadow:0 2px 8px rgba(0,0,0,0.5);
+      pointer-events:none;
+    `;
+    el.textContent = idx + 1;
+    const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
+      .setLngLat([site.lng, site.lat])
+      .addTo(map);
+    routeMarkers[site.id] = marker;
+  });
+
+  // Fit map to route
+  const coords = route.geometry.coordinates;
+  if (coords?.length) {
+    const lngs = coords.map(c => c[0]);
+    const lats = coords.map(c => c[1]);
+    map.fitBounds(
+      [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
+      { padding: 80, duration: 1000 }
+    );
+  }
+}
+
+function clearRouteFromMap() {
+  if (map.getLayer('route-line')) map.removeLayer('route-line');
+  if (map.getSource('route-source')) map.removeSource('route-source');
+  Object.values(routeMarkers).forEach(m => m.remove());
+  routeMarkers = {};
+}
+
+// Update status bar with active op name
+function updateOpsStatus() {
+  const op = getActiveOp();
+  const el = document.getElementById('status-ops');
+  if (el) el.textContent = op ? `OP: ${op.name.toUpperCase()}` : 'NO ACTIVE OP';
+}
+</script>
+</body>
+</html>
